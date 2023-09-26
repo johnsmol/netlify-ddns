@@ -1,5 +1,7 @@
 .idea
 .vscode
 .env
+.venv
+venv
 *.log
 netlify_ddns.log.*
