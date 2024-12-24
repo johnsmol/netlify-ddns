@@ -5,3 +5,4 @@
 venv
 *.log
 netlify_ddns.log.*
+*.pyc

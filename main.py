@@ -34,6 +34,7 @@ except Exception as e:
 # constants
 PUBLIC_IP_URI = 'https://api.bigdatacloud.net/data/client-ip'
 DNS_ZONES_URI = 'https://api.netlify.com/api/v1/dns_zones/'
+DEFAULT_TTL = 600
 headers = {
     'Content-Type': 'application/json;charset=utf-8',
     'Authorization': 'Bearer ' + API_TOKEN
@@ -44,7 +45,7 @@ headers = {
 def get_public_ip_address():
     try:
         logger.debug('HTTP GET to {}'.format(PUBLIC_IP_URI))
-        public_ip_address = requests.get(PUBLIC_IP_URI).json()['ipString']
+        public_ip_address = requests.get(PUBLIC_IP_URI, timeout=15).json()['ipString']
         logger.info('System current public IP address is: {}'.format(public_ip_address))
         return public_ip_address
     except Exception as ex:
@@ -60,7 +61,7 @@ def create_dns_record(hostname, value):
         'type': "A",
         'hostname': hostname,
         'value': value,
-        'ttl': 600,
+        'ttl': DEFAULT_TTL,
         'priority': None,
         'weight': None,
         'port': None,
@@ -69,7 +70,7 @@ def create_dns_record(hostname, value):
     }
 
     try:
-        res = requests.post(req_url, json=body, headers=headers)
+        res = requests.post(req_url, json=body, headers=headers, timeout=15)
         if res.status_code != 201:
             logger.error('An error occurred trying to create new DNS record. Response status code: {}'.format(res.status_code))
             sys.exit(1)
@@ -85,7 +86,7 @@ def delete_dns_record(dns_record_id):
     req_url = DNS_ZONES_URI + FQDN.split('.')[-2] + '_' + FQDN.split('.')[-1] + '/dns_records/' + dns_record_id
 
     try:
-        res = requests.delete(req_url, headers=headers)
+        res = requests.delete(req_url, headers=headers, timeout=15)
         if res.status_code != 204:
             logger.error('An error occurred trying to delete the old DNS record. Response status code: {}'.format(res.status_code))
             sys.exit(1)
