@@ -16,35 +16,44 @@ logHandler.setLevel(logging.INFO)
 logHandler.setFormatter(formatter)
 logger.addHandler(logHandler)
 
-# load .env and validate required variables
-try:
-    load_dotenv()
-
-    FQDN = os.environ.get('FQDN')
-    API_TOKEN = os.environ.get('NETLIFY_API_TOKEN')
-
-    if not FQDN or not API_TOKEN:
-        logger.error('FQDN and NETLIFY_API_TOKEN must both be set in .env')
-        sys.exit(1)
-
-    if not validators.domain(FQDN):
-        logger.error(f"Provided hostname '{FQDN}' is not a valid FQDN")
-        sys.exit(1)
-
-except Exception as e:
-    logger.error(f'Unexpected error retrieving required variables from .env file. Cause: {e}')
-    sys.exit(1)
-
 # constants
 PUBLIC_IPV4_URI = 'https://api4.ipify.org?format=json'
 PUBLIC_IPV6_URI = 'https://api6.ipify.org?format=json'
 DNS_ZONES_URI = 'https://api.netlify.com/api/v1/dns_zones/'
 DEFAULT_TTL = 600
-ZONE_SLUG = f"{FQDN.split('.')[-2]}_{FQDN.split('.')[-1]}"
-headers = {
-    'Content-Type': 'application/json;charset=utf-8',
-    'Authorization': f'Bearer {API_TOKEN}'
-}
+
+# globals initialised by setup()
+FQDN = None
+API_TOKEN = None
+ZONE_SLUG = None
+headers = None
+
+
+def setup():
+    global FQDN, API_TOKEN, ZONE_SLUG, headers
+    try:
+        load_dotenv()
+
+        FQDN = os.environ.get('FQDN')
+        API_TOKEN = os.environ.get('NETLIFY_API_TOKEN')
+
+        if not FQDN or not API_TOKEN:
+            logger.error('FQDN and NETLIFY_API_TOKEN must both be set in .env')
+            sys.exit(1)
+
+        if not validators.domain(FQDN):
+            logger.error(f"Provided hostname '{FQDN}' is not a valid FQDN")
+            sys.exit(1)
+
+    except Exception as e:
+        logger.error(f'Unexpected error retrieving required variables from .env file. Cause: {e}')
+        sys.exit(1)
+
+    ZONE_SLUG = f"{FQDN.split('.')[-2]}_{FQDN.split('.')[-1]}"
+    headers = {
+        'Content-Type': 'application/json;charset=utf-8',
+        'Authorization': f'Bearer {API_TOKEN}'
+    }
 
 
 def get_public_ip_address(version=4):
@@ -131,6 +140,8 @@ def update_record(records_list, current_ip, record_type):
 
 
 if __name__ == '__main__':
+
+    setup()
 
     logger.info('----- Executing netlify_ddns -----')
 
