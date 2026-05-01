@@ -6,3 +6,5 @@ venv
 *.log
 netlify_ddns.log.*
 *.pyc
+CLAUDE.md
+.claude
