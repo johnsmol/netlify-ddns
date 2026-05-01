@@ -36,7 +36,8 @@ except Exception as e:
     sys.exit(1)
 
 # constants
-PUBLIC_IP_URI = 'https://api.bigdatacloud.net/data/client-ip'
+PUBLIC_IPV4_URI = 'https://api4.ipify.org?format=json'
+PUBLIC_IPV6_URI = 'https://api6.ipify.org?format=json'
 DNS_ZONES_URI = 'https://api.netlify.com/api/v1/dns_zones/'
 DEFAULT_TTL = 600
 ZONE_SLUG = f"{FQDN.split('.')[-2]}_{FQDN.split('.')[-1]}"
@@ -46,20 +47,24 @@ headers = {
 }
 
 
-def get_public_ip_address():
+def get_public_ip_address(version=4):
+    uri = PUBLIC_IPV4_URI if version == 4 else PUBLIC_IPV6_URI
     try:
-        public_ip_address = requests.get(PUBLIC_IP_URI, timeout=15).json()['ipString']
-        logger.info(f'System current public IP address is: {public_ip_address}')
-        return public_ip_address
+        ip = requests.get(uri, timeout=15).json()['ip']
+        logger.info(f'System current public IPv{version} address is: {ip}')
+        return ip
     except Exception as ex:
-        logger.error(f'An error occurred trying to retrieve your public IP address. Cause: {ex}')
+        if version == 6:
+            logger.warning(f'Could not retrieve public IPv6 address, skipping AAAA record update. Cause: {ex}')
+            return None
+        logger.error(f'An error occurred trying to retrieve your public IPv{version} address. Cause: {ex}')
         sys.exit(1)
 
 
-def create_dns_record(hostname, value):
+def create_dns_record(hostname, value, record_type):
     req_url = DNS_ZONES_URI + ZONE_SLUG + '/dns_records'
     body = {
-        'type': 'A',
+        'type': record_type,
         'hostname': hostname,
         'value': value,
         'ttl': DEFAULT_TTL,
@@ -72,12 +77,12 @@ def create_dns_record(hostname, value):
     try:
         res = requests.post(req_url, json=body, headers=headers, timeout=15)
         if res.status_code != 201:
-            logger.error(f'Failed to create DNS record. Status: {res.status_code}')
+            logger.error(f'Failed to create {record_type} record. Status: {res.status_code}')
             sys.exit(1)
-        logger.info(f'New DNS record created successfully for hostname: {hostname}, with value: {value}')
+        logger.info(f'New {record_type} record created successfully for hostname: {hostname}, with value: {value}')
         return res.json()
     except Exception as ex:
-        logger.error(f'An error occurred trying to create new DNS record. Cause: {ex}')
+        logger.error(f'An error occurred trying to create new {record_type} record. Cause: {ex}')
         sys.exit(1)
 
 
@@ -103,29 +108,39 @@ def get_dns_records():
         sys.exit(1)
 
 
-def extract_target_record_id(records):
+def extract_target_record_id(records, record_type):
     for record in records:
-        if FQDN == record['hostname'] and record['type'] == 'A':
+        if FQDN == record['hostname'] and record['type'] == record_type:
             return record['id'], record['value']
     return None, None
+
+
+def update_record(records_list, current_ip, record_type):
+    if current_ip is None:
+        return
+
+    record_id, record_ip = extract_target_record_id(records_list, record_type)
+
+    if record_id is None:
+        create_dns_record(FQDN, current_ip, record_type)
+    elif current_ip != record_ip:
+        create_dns_record(FQDN, current_ip, record_type)
+        delete_dns_record(record_id)
+    else:
+        logger.info(f'{record_type} record already up-to-date for hostname: {FQDN}')
 
 
 if __name__ == '__main__':
 
     logger.info('----- Executing netlify_ddns -----')
 
-    current_public_ip = get_public_ip_address()
+    current_ipv4 = get_public_ip_address(version=4)
+    current_ipv6 = get_public_ip_address(version=6)
 
     records_list = get_dns_records()
-    record_id, record_ip = extract_target_record_id(records_list)
 
-    if record_id is None:
-        create_dns_record(FQDN, current_public_ip)
-    elif current_public_ip != record_ip:
-        create_dns_record(FQDN, current_public_ip)
-        delete_dns_record(record_id)
-    else:
-        logger.info(f'DNS record already up-to-date for hostname: {FQDN}')
+    update_record(records_list, current_ipv4, 'A')
+    update_record(records_list, current_ipv6, 'AAAA')
 
     logger.info('----- Script executed successfully -----')
     sys.exit(0)
