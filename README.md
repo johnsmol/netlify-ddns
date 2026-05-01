@@ -1,6 +1,6 @@
 # Netlify DDNS
 
-A lightweight Python script that implements Dynamic DNS (DDNS) for domains managed by Netlify. It automatically keeps a DNS `A` record (IPv4) and `AAAA` record (IPv6) pointed at the current public IP address of the machine running it — no paid DDNS service required.
+A lightweight Python script that implements Dynamic DNS (DDNS) for domains managed by Netlify. It automatically keeps a DNS `A` record (IPv4) and `AAAA` record (IPv6) pointed at the current public IP address of the machine running it. No paid DDNS service required.
 
 ## How it works
 
